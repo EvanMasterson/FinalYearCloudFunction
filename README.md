@@ -1,7 +1,9 @@
 ### Dependencies:
-    https://github.com/EvanMasterson/FinalYearAndroid
-    https://github.com/EvanMasterson/FinalYearTizen
-    https://github.com/EvanMasterson/FinalYearCloudFunction
+[Android Application](https://github.com/EvanMasterson/FinalYearAndroid)
+
+[Smartwatch Application](https://github.com/EvanMasterson/FinalYearTizen)
+
+[Cloud Functions](https://github.com/EvanMasterson/FinalYearCloudFunction)
     
 ### Purpose:
 Provides Firebase cloud based functions to trigger an evaluation upon changes to certain Firebase Database fields associated with geofence zones.
