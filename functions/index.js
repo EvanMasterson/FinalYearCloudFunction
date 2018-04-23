@@ -1,5 +1,7 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
+// npm package to check if latlng point is inside polygon
+const checkInside = require('point-in-polygon');
 admin.initializeApp();
 
 exports.checkLatLng = functions.database.ref('{userId}').onUpdate((snapshot, context) => {
@@ -31,7 +33,7 @@ exports.checkLatLng = functions.database.ref('{userId}').onUpdate((snapshot, con
                 for(let i=0; i<zoneData.val().length; i++){
                     let lat = zoneData.val()[i].latitude;
                     let lng = zoneData.val()[i].longitude ;
-                    zone.push({"latitude": lat, "longitude": lng})
+                    zone.push([lat, lng])
                 }
                 if(latitude && longitude && zone && tokenId){
                    checkLocation(latitude, longitude, zone, tokenId);
@@ -43,13 +45,21 @@ exports.checkLatLng = functions.database.ref('{userId}').onUpdate((snapshot, con
     return true;
 });
 
+/*
+Function to check if current user location is inside a zone or not
+If it returns true, we send a notification to that user using their device tokenId
+ */
 function checkLocation(latitude, longitude, zone, tokenId){
-    // TODO check if lat lng is inside the zone
     console.log(latitude, longitude, zone);
-    // If location is inside zone we will send notification
-    sendNotification(tokenId);
+    if(checkInside([latitude, longitude], zone)) {
+        console.log("Inside zone");
+        sendNotification(tokenId);
+    } else {
+        console.log("Not in zone");
+    }
 }
 
+// Function triggered by checkLocation to send notification to user
 function sendNotification(tokenId){
     let notificationPayload = {
         token: tokenId,
