@@ -11,6 +11,7 @@ const twilio = require('twilio');
 // Set these credentials using cmd line with: firebase functions:config:set twilio.sid="CHANGE_ME" twilio.token="CHANGE_ME"
 const accountSid = functions.config().twilio.sid;
 const authToken = functions.config().twilio.token;
+const client = new twilio(accountSid, authToken);
 
 // Initialise app
 admin.initializeApp();
@@ -25,7 +26,6 @@ exports.checkLatLng = functions.database.ref('{userId}').onUpdate((snapshot, con
     let longitude;
     let tokenId;
     let phone;
-    const userId = context.params.userId.toString();
 
     snapshot.after.forEach(data =>{
         let key = data.key.toString();
@@ -50,18 +50,23 @@ exports.checkLatLng = functions.database.ref('{userId}').onUpdate((snapshot, con
         if(key==='zones'){
             data.forEach(zoneData =>{
                 let zone=[];
+                let colour;
                 console.log("ZoneKey: "+zoneData.key.toString());
                 for(let i=0; i<zoneData.val().length; i++){
-                    let lat = zoneData.val()[i].latitude;
-                    let lng = zoneData.val()[i].longitude ;
-                    zone.push([lat, lng])
+                    if(i===zoneData.val().length-1){
+                        colour = zoneData.val()[i].colour;
+                    } else {
+                        let lat = zoneData.val()[i].latitude;
+                        let lng = zoneData.val()[i].longitude;
+                        zone.push([lat, lng])
+                    }
                 }
-                if(latitude && longitude && zone && tokenId && phone){
-                   checkLocation(latitude, longitude, zone, tokenId, phone);
-                   zone=[];
-                } else if(latitude && longitude && zone && tokenId){
-                    checkLocation(latitude, longitude, zone, tokenId);
-                    zone=[];
+                if(latitude && longitude && zone && colour && tokenId && phone){
+                    // Notification & text
+                   checkLocation(latitude, longitude, zone, colour, tokenId, phone);
+                } else if(latitude && longitude && zone && colour && tokenId){
+                    // Just Notification
+                    checkLocation(latitude, longitude, zone, colour, tokenId);
                 }
             });
         }
@@ -74,13 +79,17 @@ exports.checkLatLng = functions.database.ref('{userId}').onUpdate((snapshot, con
     If it returns true, we send a notification to that user using their device tokenId
     If user has registered a phone number we also send a text message using twilio api
  */
-function checkLocation(latitude, longitude, zone, tokenId, phone){
-    console.log(latitude, longitude, zone);
+function checkLocation(latitude, longitude, zone, colour, tokenId, phone){
+    console.log(latitude, longitude, zone, colour);
     if(checkInside([latitude, longitude], zone)) {
         console.log("Inside zone");
-        sendNotification(tokenId);
-        if(phone){
-            sendTextMessage(phone);
+        if(colour === "Green") {
+            sendNotification(tokenId, colour);
+        } else if(colour === "Yellow" || colour === "Red") {
+            sendNotification(tokenId, colour);
+            if (phone) {
+                sendTextMessage(phone, colour);
+            }
         }
     } else {
         console.log("Not in zone");
@@ -88,12 +97,12 @@ function checkLocation(latitude, longitude, zone, tokenId, phone){
 }
 
 // Function triggered by checkLocation to send notification to user
-function sendNotification(tokenId){
+function sendNotification(tokenId, colour){
     let notificationPayload = {
         token: tokenId,
         notification: {
             title: "Geofence Monitor",
-            body: "ALERT !!!\nUser has entered an unsafe area.\nOpen to view current status."
+            body: "ALERT !!!\nUser has entered "+colour+" zone.\nOpen application for more info."
         },
         android: {
             notification: {
@@ -109,11 +118,10 @@ function sendNotification(tokenId){
 }
 
 // Function triggered by checkLocation to send automated text to user with twilio api
-function sendTextMessage(phone){
+function sendTextMessage(phone, colour){
     console.log(phone);
-    const client = new twilio(accountSid, authToken);
     client.messages.create({
-        body: "Automated text ALERT !!!\nUser has entered an unsafe area.\nOpen application for more info.",
+        body: "Automated text ALERT !!!\nUser has entered "+colour+" zone.\nOpen application for more info.",
         to: phone,
         from: '+16308668643',
     }).then((message) => {
