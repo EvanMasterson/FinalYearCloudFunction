@@ -24,6 +24,7 @@ admin.initializeApp();
 exports.checkLatLng = functions.database.ref('{userId}').onUpdate((snapshot, context) => {
     let latitude;
     let longitude;
+    let notifications;
     let tokenId;
     let phone;
 
@@ -38,6 +39,10 @@ exports.checkLatLng = functions.database.ref('{userId}').onUpdate((snapshot, con
         if(key==='longitude'){
             longitude = value;
             console.log("Longitude: " + longitude);
+        }
+        if(key==='notifications'){
+            notifications = value;
+            console.log("Notifications: " + notifications);
         }
         if(key==='tokenId'){
             tokenId = value;
@@ -61,12 +66,15 @@ exports.checkLatLng = functions.database.ref('{userId}').onUpdate((snapshot, con
                         zone.push([lat, lng])
                     }
                 }
-                if(latitude && longitude && zone && colour && tokenId && phone){
-                    // Notification & text
-                   checkLocation(latitude, longitude, zone, colour, tokenId, phone);
-                } else if(latitude && longitude && zone && colour && tokenId){
-                    // Just Notification
-                    checkLocation(latitude, longitude, zone, colour, tokenId);
+                // If notification alerts are turned on then proceed
+                if(notifications) {
+                    if (latitude && longitude && zone && colour && tokenId && phone) {
+                        // Notification & text
+                        checkLocation(latitude, longitude, zone, colour, tokenId, phone);
+                    } else if (latitude && longitude && zone && colour && tokenId) {
+                        // Just Notification
+                        checkLocation(latitude, longitude, zone, colour, tokenId);
+                    }
                 }
             });
         }
