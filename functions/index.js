@@ -3,6 +3,10 @@ const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 // npm package to check if latlng point is inside polygon
 const checkInside = require('point-in-polygon');
+// npm package to fetch api data from mockaroo
+const fetch = require("node-fetch");
+const domain = 'my.api.mockaroo.com';
+const headers = { "X-API-Key": functions.config().mockaroo.api };
 /*
     Require Twilio service
     Firebase Flame or Blaze plan required to make calls to external api's
@@ -21,65 +25,68 @@ admin.initializeApp();
     On changing, triggers function to check if user location has entered zone or not
     Given sufficient tokenId and phone number, push notifications and twilio automated texts triggered
  */
-exports.checkLatLng = functions.database.ref('{userId}').onUpdate((snapshot, context) => {
+exports.checkLatLng = functions.database.ref('{userId}/latitude').onUpdate((snapshot, context) => {
+    const userId = context.params.userId.toString();
+    updateHeartRate(userId);
     let latitude;
     let longitude;
     let notifications;
     let tokenId;
     let phone;
 
-    snapshot.after.forEach(data =>{
-        let key = data.key.toString();
-        let value = data.val().toString();
+    return admin.database().ref(userId).once('value', snapshot => {
+        snapshot.forEach(data =>{
+            let key = data.key.toString();
+            let value = data.val().toString();
 
-        if(key==='latitude'){
-            latitude = value;
-            console.log("Latitude: "+latitude);
-        }
-        if(key==='longitude'){
-            longitude = value;
-            console.log("Longitude: " + longitude);
-        }
-        if(key==='notifications'){
-            notifications = value;
-            console.log("Notifications: " + notifications);
-        }
-        if(key==='tokenId'){
-            tokenId = value;
-            console.log("TokenId: " + tokenId);
-        }
-        if(key==='phone'){
-            phone = value;
-            console.log("Phone: " + phone)
-        }
-        if(key==='zones'){
-            data.forEach(zoneData =>{
-                let zone=[];
-                let colour;
-                console.log("ZoneKey: "+zoneData.key.toString());
-                for(let i=0; i<zoneData.val().length; i++){
-                    if(i===zoneData.val().length-1){
-                        colour = zoneData.val()[i].colour;
-                    } else {
-                        let lat = zoneData.val()[i].latitude;
-                        let lng = zoneData.val()[i].longitude;
-                        zone.push([lat, lng])
+            if(key==='latitude'){
+                latitude = value;
+                console.log("Latitude: "+latitude);
+            }
+            if(key==='longitude'){
+                longitude = value;
+                console.log("Longitude: " + longitude);
+            }
+            if(key==='notifications'){
+                notifications = value;
+                console.log("Notifications: " + notifications);
+            }
+            if(key==='tokenId'){
+                tokenId = value;
+                console.log("TokenId: " + tokenId);
+            }
+            if(key==='phone'){
+                phone = value;
+                console.log("Phone: " + phone)
+            }
+            if(key==='zones'){
+                data.forEach(zoneData =>{
+                    let zone=[];
+                    let colour;
+                    console.log("ZoneKey: "+zoneData.key.toString());
+                    for(let i=0; i<zoneData.val().length; i++){
+                        if(i===zoneData.val().length-1){
+                            colour = zoneData.val()[i].colour;
+                        } else {
+                            let lat = zoneData.val()[i].latitude;
+                            let lng = zoneData.val()[i].longitude;
+                            zone.push([lat, lng])
+                        }
                     }
-                }
-                // If notification alerts are turned on then proceed
-                if(notifications) {
-                    if (latitude && longitude && zone && colour && tokenId && phone) {
-                        // Notification & text
-                        checkLocation(latitude, longitude, zone, colour, tokenId, phone);
-                    } else if (latitude && longitude && zone && colour && tokenId) {
-                        // Just Notification
-                        checkLocation(latitude, longitude, zone, colour, tokenId);
+                    // If notification alerts are turned on then proceed
+                    if(notifications==='true') {
+                        if (latitude && longitude && zone && colour && tokenId && phone) {
+                            // Notification & text
+                            checkLocation(latitude, longitude, zone, colour, tokenId, phone);
+                        } else if (latitude && longitude && zone && colour && tokenId) {
+                            // Just Notification
+                            checkLocation(latitude, longitude, zone, colour, tokenId);
+                        }
                     }
-                }
-            });
-        }
+                });
+            }
+        });
     });
-    return true;
 });
 
 /*
@@ -137,4 +144,33 @@ function sendTextMessage(phone, colour){
     }).catch((error) => {
         console.log(error);
     });
+}
+
+function updateHeartRate(userId){
+    let heart_rate;
+    let date_time;
+    let existingData = [];
+    fetch(`http://${domain}/heart_rate.json`, { headers })
+        .then(response => response.json())
+        .then(data => {
+            heart_rate = data.heart_rate;
+            date_time = data.date_time;
+            let json = {
+                "heart_rate": heart_rate,
+                "date_time": date_time
+            };
+            return admin.database().ref(userId+'/heart_rate').once('value', snapshot => {
+                if(snapshot.val() !== null) {
+                    for (let i = 0; i < snapshot.val().length; i++) {
+                        let json = {
+                            "heart_rate": snapshot.val()[i].heart_rate,
+                            "date_time": snapshot.val()[i].date_time
+                        };
+                        existingData.push(json);
+                    }
+                }
+                existingData.push(json);
+                return admin.database().ref(userId).child('heart_rate').set(existingData);
+            });
+        });
 }
