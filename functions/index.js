@@ -166,7 +166,10 @@ function updateHeartRate(userId){
                             "heart_rate": snapshot.val()[i].heart_rate,
                             "date_time": snapshot.val()[i].date_time
                         };
-                        existingData.push(json);
+                        let time = new Date().getTime()/1000;
+                        if((time-json.date_time) < 86400){
+                            existingData.push(json);
+                        }
                     }
                 }
                 existingData.push(json);
